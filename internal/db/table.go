@@ -1,4 +1,4 @@
-package main
+package db
 
 import (
 	"context"
@@ -11,8 +11,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
-// ensureTableExists creates the DynamoDB table if it doesn't already exist
-func ensureTableExists(ctx context.Context, svc *dynamodb.Client, tableName string) error {
+// EnsureTableExists creates the DynamoDB table if it doesn't already exist
+func EnsureTableExists(ctx context.Context, svc *dynamodb.Client, tableName string) error {
 	// Check if table exists
 	_, err := svc.DescribeTable(ctx, &dynamodb.DescribeTableInput{
 		TableName: aws.String(tableName),

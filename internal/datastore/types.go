@@ -1,8 +1,9 @@
-package main
+package datastore
 
 import (
-	"errors"
 	"fmt"
+
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 )
 
 // Entity types for our single table design
@@ -15,17 +16,6 @@ const (
 // Custom key types for type safety
 type PrimaryKey string
 type SortKey string
-
-// Error types
-var (
-	ErrNotFound    = errors.New("item not found")
-	ErrInvalidData = errors.New("invalid data")
-)
-
-// Validator interface for entities
-type Validator interface {
-	Validate() error
-}
 
 // Key constructors
 func NewUserPK(email string) PrimaryKey {
@@ -46,4 +36,18 @@ type GenericItem[T any] struct {
 	SK         SortKey    `dynamodbav:"SK"`
 	EntityType string     `dynamodbav:"entity_type"`
 	Data       T          `dynamodbav:"data"`
+}
+
+// Store represents a DynamoDB store
+type Store struct {
+	client    *dynamodb.Client
+	tableName string
+}
+
+// NewStore creates a new Store instance
+func NewStore(client *dynamodb.Client, tableName string) *Store {
+	return &Store{
+		client:    client,
+		tableName: tableName,
+	}
 }

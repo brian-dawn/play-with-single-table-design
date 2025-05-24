@@ -1,7 +1,8 @@
-package main
+package datastore
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -10,26 +11,13 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
-// Store handles DynamoDB operations with type safety
-type Store[T Validator] struct {
-	client    *dynamodb.Client
-	tableName string
-}
-
-// NewStore creates a new Store instance
-func NewStore[T Validator](client *dynamodb.Client, tableName string) *Store[T] {
-	return &Store[T]{
-		client:    client,
-		tableName: tableName,
-	}
-}
+// Common errors
+var (
+	ErrNotFound = errors.New("item not found")
+)
 
 // PutItem is a generic function to put any item into DynamoDB
-func (s *Store[T]) PutItem(ctx context.Context, item GenericItem[T]) error {
-	if err := item.Data.Validate(); err != nil {
-		return fmt.Errorf("validation failed: %w", err)
-	}
-
+func (s *Store) PutItem(ctx context.Context, item interface{}) error {
 	av, err := attributevalue.MarshalMap(item)
 	if err != nil {
 		return fmt.Errorf("failed to marshal item: %w", err)
@@ -43,7 +31,7 @@ func (s *Store[T]) PutItem(ctx context.Context, item GenericItem[T]) error {
 }
 
 // GetItem is a generic function to get any item from DynamoDB
-func (s *Store[T]) GetItem(ctx context.Context, pk PrimaryKey, sk SortKey) (*GenericItem[T], error) {
+func (s *Store) GetItem(ctx context.Context, pk PrimaryKey, sk SortKey, out interface{}) error {
 	result, err := s.client.GetItem(ctx, &dynamodb.GetItemInput{
 		TableName: aws.String(s.tableName),
 		Key: map[string]types.AttributeValue{
@@ -52,23 +40,22 @@ func (s *Store[T]) GetItem(ctx context.Context, pk PrimaryKey, sk SortKey) (*Gen
 		},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to get item: %w", err)
+		return fmt.Errorf("failed to get item: %w", err)
 	}
 
 	if result.Item == nil {
-		return nil, ErrNotFound
+		return ErrNotFound
 	}
 
-	var item GenericItem[T]
-	if err := attributevalue.UnmarshalMap(result.Item, &item); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal item: %w", err)
+	if err := attributevalue.UnmarshalMap(result.Item, out); err != nil {
+		return fmt.Errorf("failed to unmarshal item: %w", err)
 	}
 
-	return &item, nil
+	return nil
 }
 
 // Query is a generic function to query items from DynamoDB
-func (s *Store[T]) Query(ctx context.Context, pk PrimaryKey, skPrefix string) ([]GenericItem[T], error) {
+func (s *Store) Query(ctx context.Context, pk PrimaryKey, skPrefix string) ([]map[string]types.AttributeValue, error) {
 	queryInput := &dynamodb.QueryInput{
 		TableName:              aws.String(s.tableName),
 		KeyConditionExpression: aws.String("PK = :pk AND begins_with(SK, :sk)"),
@@ -83,10 +70,5 @@ func (s *Store[T]) Query(ctx context.Context, pk PrimaryKey, skPrefix string) ([
 		return nil, fmt.Errorf("failed to query items: %w", err)
 	}
 
-	var items []GenericItem[T]
-	if err := attributevalue.UnmarshalListOfMaps(result.Items, &items); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal items: %w", err)
-	}
-
-	return items, nil
+	return result.Items, nil
 }

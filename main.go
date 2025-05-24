@@ -14,6 +14,10 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+
+	"LearnSingleTableDesign/internal/datastore"
+	"LearnSingleTableDesign/internal/db"
+	"LearnSingleTableDesign/internal/models"
 )
 
 func main() {
@@ -44,33 +48,33 @@ func main() {
 	// Create DynamoDB client
 	client := dynamodb.NewFromConfig(cfg)
 
-	// Create store instances
+	// Create repositories
 	tableName := "AppTable"
-	userStore := NewUserStore(client, tableName)
-	orderStore := NewOrderStore(client, tableName)
+	userRepo := datastore.NewUserRepository(client, tableName)
+	orderRepo := datastore.NewOrderRepository(client, tableName)
 
 	// Ensure the table exists before proceeding
-	if err := ensureTableExists(context.TODO(), client, tableName); err != nil {
+	if err := db.EnsureTableExists(context.TODO(), client, tableName); err != nil {
 		log.Fatalf("failed to ensure table exists: %v", err)
 	}
 
 	// Example: Create a new user
-	user := User{
+	user := models.User{
 		Email:     "john@example.com",
 		Name:      "John Doe",
 		CreatedAt: time.Now(),
 	}
 
 	// Put user in DynamoDB
-	if err := userStore.PutUser(context.TODO(), user); err != nil {
+	if err := userRepo.Put(context.TODO(), user); err != nil {
 		log.Fatalf("failed to put user: %v", err)
 	}
 	fmt.Println("Successfully created user:", user.Email)
 
 	// Get user from DynamoDB
-	retrievedUser, err := userStore.GetUser(context.TODO(), user.Email)
+	retrievedUser, err := userRepo.Get(context.TODO(), user.Email)
 	if err != nil {
-		if errors.Is(err, ErrNotFound) {
+		if errors.Is(err, datastore.ErrNotFound) {
 			fmt.Println("User not found")
 		} else {
 			log.Fatalf("failed to get user: %v", err)
@@ -80,7 +84,7 @@ func main() {
 	}
 
 	// Example: Create an order for the user
-	order := Order{
+	order := models.Order{
 		OrderID:   "ORD123",
 		UserEmail: user.Email,
 		Status:    "PENDING",
@@ -90,13 +94,13 @@ func main() {
 	}
 
 	// Put order in DynamoDB
-	if err := orderStore.PutOrder(context.TODO(), order); err != nil {
+	if err := orderRepo.Put(context.TODO(), order); err != nil {
 		log.Fatalf("failed to put order: %v", err)
 	}
 	fmt.Println("Successfully created order:", order.OrderID)
 
 	// Get all orders for the user
-	orders, err := orderStore.GetUserOrders(context.TODO(), user.Email)
+	orders, err := orderRepo.GetUserOrders(context.TODO(), user.Email)
 	if err != nil {
 		log.Fatalf("failed to get user orders: %v", err)
 	}

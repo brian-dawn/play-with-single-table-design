@@ -1,9 +1,19 @@
-package main
+package models
 
 import (
 	"fmt"
 	"time"
 )
+
+// ValidationError represents a validation error
+type ValidationError struct {
+	Field string
+	Msg   string
+}
+
+func (e *ValidationError) Error() string {
+	return fmt.Sprintf("%s: %s", e.Field, e.Msg)
+}
 
 // User represents a user in our system
 type User struct {
@@ -14,10 +24,10 @@ type User struct {
 
 func (u User) Validate() error {
 	if u.Email == "" {
-		return fmt.Errorf("%w: email is required", ErrInvalidData)
+		return &ValidationError{Field: "email", Msg: "email is required"}
 	}
 	if u.Name == "" {
-		return fmt.Errorf("%w: name is required", ErrInvalidData)
+		return &ValidationError{Field: "name", Msg: "name is required"}
 	}
 	return nil
 }
@@ -34,10 +44,10 @@ type Order struct {
 
 func (o Order) Validate() error {
 	if o.OrderID == "" {
-		return fmt.Errorf("%w: order_id is required", ErrInvalidData)
+		return &ValidationError{Field: "order_id", Msg: "order_id is required"}
 	}
 	if o.UserEmail == "" {
-		return fmt.Errorf("%w: user_email is required", ErrInvalidData)
+		return &ValidationError{Field: "user_email", Msg: "user_email is required"}
 	}
 	return nil
 }
@@ -48,4 +58,9 @@ type Product struct {
 	Name      string    `dynamodbav:"name"`
 	Price     float64   `dynamodbav:"price"`
 	CreatedAt time.Time `dynamodbav:"created_at"`
+}
+
+// Validator interface for entities
+type Validator interface {
+	Validate() error
 }
