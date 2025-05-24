@@ -6,7 +6,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -27,11 +26,49 @@ const (
 	EntityProduct = "PRODUCT"
 )
 
+// Custom key types for type safety
+type PrimaryKey string
+type SortKey string
+
+// Key constructors
+func NewUserPK(email string) PrimaryKey {
+	return PrimaryKey(fmt.Sprintf("USER#%s", email))
+}
+
+func NewUserSK(email string) SortKey {
+	return SortKey(fmt.Sprintf("PROFILE#%s", email))
+}
+
+func NewOrderSK(orderID string) SortKey {
+	return SortKey(fmt.Sprintf("ORDER#%s", orderID))
+}
+
+// Error types
+var (
+	ErrNotFound    = errors.New("item not found")
+	ErrInvalidData = errors.New("invalid data")
+)
+
+// Validator interface for entities
+type Validator interface {
+	Validate() error
+}
+
 // User represents a user in our system
 type User struct {
 	Email     string    `dynamodbav:"email"`
 	Name      string    `dynamodbav:"name"`
 	CreatedAt time.Time `dynamodbav:"created_at"`
+}
+
+func (u User) Validate() error {
+	if u.Email == "" {
+		return fmt.Errorf("%w: email is required", ErrInvalidData)
+	}
+	if u.Name == "" {
+		return fmt.Errorf("%w: name is required", ErrInvalidData)
+	}
+	return nil
 }
 
 // Order represents an order in our system
@@ -44,6 +81,16 @@ type Order struct {
 	Products  []string  `dynamodbav:"products"`
 }
 
+func (o Order) Validate() error {
+	if o.OrderID == "" {
+		return fmt.Errorf("%w: order_id is required", ErrInvalidData)
+	}
+	if o.UserEmail == "" {
+		return fmt.Errorf("%w: user_email is required", ErrInvalidData)
+	}
+	return nil
+}
+
 // Product represents a product in our system
 type Product struct {
 	SKU       string    `dynamodbav:"sku"`
@@ -52,30 +99,34 @@ type Product struct {
 	CreatedAt time.Time `dynamodbav:"created_at"`
 }
 
-// Item represents our DynamoDB item structure
-type Item struct {
-	PK         string      `dynamodbav:"PK"`
-	SK         string      `dynamodbav:"SK"`
-	EntityType string      `dynamodbav:"entity_type"`
-	Data       interface{} `dynamodbav:"data"`
+// GenericItem makes the Data field type-safe
+type GenericItem[T any] struct {
+	PK         PrimaryKey `dynamodbav:"PK"`
+	SK         SortKey    `dynamodbav:"SK"`
+	EntityType string     `dynamodbav:"entity_type"`
+	Data       T          `dynamodbav:"data"`
 }
 
-// Store handles DynamoDB operations
-type Store struct {
+// Store handles DynamoDB operations with type safety
+type Store[T Validator] struct {
 	client    *dynamodb.Client
 	tableName string
 }
 
 // NewStore creates a new Store instance
-func NewStore(client *dynamodb.Client, tableName string) *Store {
-	return &Store{
+func NewStore[T Validator](client *dynamodb.Client, tableName string) *Store[T] {
+	return &Store[T]{
 		client:    client,
 		tableName: tableName,
 	}
 }
 
 // PutItem is a generic function to put any item into DynamoDB
-func (s *Store) PutItem(ctx context.Context, item Item) error {
+func (s *Store[T]) PutItem(ctx context.Context, item GenericItem[T]) error {
+	if err := item.Data.Validate(); err != nil {
+		return fmt.Errorf("validation failed: %w", err)
+	}
+
 	av, err := attributevalue.MarshalMap(item)
 	if err != nil {
 		return fmt.Errorf("failed to marshal item: %w", err)
@@ -89,12 +140,12 @@ func (s *Store) PutItem(ctx context.Context, item Item) error {
 }
 
 // GetItem is a generic function to get any item from DynamoDB
-func (s *Store) GetItem(ctx context.Context, pk, sk string) (*Item, error) {
+func (s *Store[T]) GetItem(ctx context.Context, pk PrimaryKey, sk SortKey) (*GenericItem[T], error) {
 	result, err := s.client.GetItem(ctx, &dynamodb.GetItemInput{
 		TableName: aws.String(s.tableName),
 		Key: map[string]types.AttributeValue{
-			"PK": &types.AttributeValueMemberS{Value: pk},
-			"SK": &types.AttributeValueMemberS{Value: sk},
+			"PK": &types.AttributeValueMemberS{Value: string(pk)},
+			"SK": &types.AttributeValueMemberS{Value: string(sk)},
 		},
 	})
 	if err != nil {
@@ -102,10 +153,10 @@ func (s *Store) GetItem(ctx context.Context, pk, sk string) (*Item, error) {
 	}
 
 	if result.Item == nil {
-		return nil, nil
+		return nil, ErrNotFound
 	}
 
-	var item Item
+	var item GenericItem[T]
 	if err := attributevalue.UnmarshalMap(result.Item, &item); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal item: %w", err)
 	}
@@ -114,12 +165,12 @@ func (s *Store) GetItem(ctx context.Context, pk, sk string) (*Item, error) {
 }
 
 // Query is a generic function to query items from DynamoDB
-func (s *Store) Query(ctx context.Context, pk, skPrefix string) ([]Item, error) {
+func (s *Store[T]) Query(ctx context.Context, pk PrimaryKey, skPrefix string) ([]GenericItem[T], error) {
 	queryInput := &dynamodb.QueryInput{
 		TableName:              aws.String(s.tableName),
 		KeyConditionExpression: aws.String("PK = :pk AND begins_with(SK, :sk)"),
 		ExpressionAttributeValues: map[string]types.AttributeValue{
-			":pk": &types.AttributeValueMemberS{Value: pk},
+			":pk": &types.AttributeValueMemberS{Value: string(pk)},
 			":sk": &types.AttributeValueMemberS{Value: skPrefix},
 		},
 	}
@@ -129,7 +180,7 @@ func (s *Store) Query(ctx context.Context, pk, skPrefix string) ([]Item, error) 
 		return nil, fmt.Errorf("failed to query items: %w", err)
 	}
 
-	var items []Item
+	var items []GenericItem[T]
 	if err := attributevalue.UnmarshalListOfMaps(result.Items, &items); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal items: %w", err)
 	}
@@ -137,71 +188,65 @@ func (s *Store) Query(ctx context.Context, pk, skPrefix string) ([]Item, error) 
 	return items, nil
 }
 
-// UnmarshalData unmarshals the Data field of an Item into the provided interface
-func UnmarshalData(item *Item, v interface{}) error {
-	bytes, err := json.Marshal(item.Data)
-	if err != nil {
-		return fmt.Errorf("failed to marshal data to JSON: %w", err)
-	}
-
-	if err := json.Unmarshal(bytes, v); err != nil {
-		return fmt.Errorf("failed to unmarshal data: %w", err)
-	}
-
-	return nil
+// UserStore provides type-safe operations for User entities
+type UserStore struct {
+	store *Store[User]
 }
 
-// User-specific helper functions
-func (s *Store) PutUser(ctx context.Context, user User) error {
-	item := Item{
-		PK:         fmt.Sprintf("USER#%s", user.Email),
-		SK:         fmt.Sprintf("PROFILE#%s", user.Email),
+func NewUserStore(client *dynamodb.Client, tableName string) *UserStore {
+	return &UserStore{
+		store: NewStore[User](client, tableName),
+	}
+}
+
+func (s *UserStore) PutUser(ctx context.Context, user User) error {
+	item := GenericItem[User]{
+		PK:         NewUserPK(user.Email),
+		SK:         NewUserSK(user.Email),
 		EntityType: EntityUser,
 		Data:       user,
 	}
-	return s.PutItem(ctx, item)
+	return s.store.PutItem(ctx, item)
 }
 
-func (s *Store) GetUser(ctx context.Context, email string) (*User, error) {
-	item, err := s.GetItem(ctx, fmt.Sprintf("USER#%s", email), fmt.Sprintf("PROFILE#%s", email))
+func (s *UserStore) GetUser(ctx context.Context, email string) (*User, error) {
+	item, err := s.store.GetItem(ctx, NewUserPK(email), NewUserSK(email))
 	if err != nil {
 		return nil, err
 	}
-	if item == nil {
-		return nil, nil
-	}
-
-	var user User
-	if err := UnmarshalData(item, &user); err != nil {
-		return nil, err
-	}
-	return &user, nil
+	return &item.Data, nil
 }
 
-// Order-specific helper functions
-func (s *Store) PutOrder(ctx context.Context, order Order) error {
-	item := Item{
-		PK:         fmt.Sprintf("USER#%s", order.UserEmail),
-		SK:         fmt.Sprintf("ORDER#%s", order.OrderID),
+// OrderStore provides type-safe operations for Order entities
+type OrderStore struct {
+	store *Store[Order]
+}
+
+func NewOrderStore(client *dynamodb.Client, tableName string) *OrderStore {
+	return &OrderStore{
+		store: NewStore[Order](client, tableName),
+	}
+}
+
+func (s *OrderStore) PutOrder(ctx context.Context, order Order) error {
+	item := GenericItem[Order]{
+		PK:         NewUserPK(order.UserEmail),
+		SK:         NewOrderSK(order.OrderID),
 		EntityType: EntityOrder,
 		Data:       order,
 	}
-	return s.PutItem(ctx, item)
+	return s.store.PutItem(ctx, item)
 }
 
-func (s *Store) GetUserOrders(ctx context.Context, userEmail string) ([]Order, error) {
-	items, err := s.Query(ctx, fmt.Sprintf("USER#%s", userEmail), "ORDER#")
+func (s *OrderStore) GetUserOrders(ctx context.Context, userEmail string) ([]Order, error) {
+	items, err := s.store.Query(ctx, NewUserPK(userEmail), "ORDER#")
 	if err != nil {
 		return nil, err
 	}
 
-	orders := make([]Order, 0, len(items))
-	for _, item := range items {
-		var order Order
-		if err := UnmarshalData(&item, &order); err != nil {
-			return nil, err
-		}
-		orders = append(orders, order)
+	orders := make([]Order, len(items))
+	for i, item := range items {
+		orders[i] = item.Data
 	}
 	return orders, nil
 }
@@ -296,9 +341,10 @@ func main() {
 	// Create DynamoDB client
 	client := dynamodb.NewFromConfig(cfg)
 
-	// Create store instance
+	// Create store instances
 	tableName := "AppTable"
-	store := NewStore(client, tableName)
+	userStore := NewUserStore(client, tableName)
+	orderStore := NewOrderStore(client, tableName)
 
 	// Ensure the table exists before proceeding
 	if err := ensureTableExists(context.TODO(), client, tableName); err != nil {
@@ -313,17 +359,20 @@ func main() {
 	}
 
 	// Put user in DynamoDB
-	if err := store.PutUser(context.TODO(), user); err != nil {
+	if err := userStore.PutUser(context.TODO(), user); err != nil {
 		log.Fatalf("failed to put user: %v", err)
 	}
 	fmt.Println("Successfully created user:", user.Email)
 
 	// Get user from DynamoDB
-	retrievedUser, err := store.GetUser(context.TODO(), user.Email)
+	retrievedUser, err := userStore.GetUser(context.TODO(), user.Email)
 	if err != nil {
-		log.Fatalf("failed to get user: %v", err)
-	}
-	if retrievedUser != nil {
+		if errors.Is(err, ErrNotFound) {
+			fmt.Println("User not found")
+		} else {
+			log.Fatalf("failed to get user: %v", err)
+		}
+	} else {
 		fmt.Printf("Retrieved user: %+v\n", retrievedUser)
 	}
 
@@ -338,13 +387,13 @@ func main() {
 	}
 
 	// Put order in DynamoDB
-	if err := store.PutOrder(context.TODO(), order); err != nil {
+	if err := orderStore.PutOrder(context.TODO(), order); err != nil {
 		log.Fatalf("failed to put order: %v", err)
 	}
 	fmt.Println("Successfully created order:", order.OrderID)
 
 	// Get all orders for the user
-	orders, err := store.GetUserOrders(context.TODO(), user.Email)
+	orders, err := orderStore.GetUserOrders(context.TODO(), user.Email)
 	if err != nil {
 		log.Fatalf("failed to get user orders: %v", err)
 	}
