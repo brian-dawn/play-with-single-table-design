@@ -2,10 +2,10 @@ package datastore
 
 import (
 	"context"
-	"fmt"
 
-	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+
+	"LearnSingleTableDesign/internal/models"
 )
 
 // UserRepository handles User entity operations
@@ -21,24 +21,24 @@ func NewUserRepository(client *dynamodb.Client, tableName string) *UserRepositor
 }
 
 // Put stores a user in DynamoDB
-func (r *UserRepository) Put(ctx context.Context, user interface{}) error {
-	item := GenericItem[interface{}]{
-		PK:         NewUserPK(user.(struct{ Email string }).Email),
-		SK:         NewUserSK(user.(struct{ Email string }).Email),
+func (r *UserRepository) Put(ctx context.Context, user models.User) error {
+	item := GenericItem[models.User]{
+		PK:         NewUserPK(user.Email),
+		SK:         NewUserSK(user.Email),
 		EntityType: EntityUser,
 		Data:       user,
 	}
-	return r.store.PutItem(ctx, item)
+	return PutItem(ctx, r.store, item)
 }
 
 // Get retrieves a user from DynamoDB
-func (r *UserRepository) Get(ctx context.Context, email string) (interface{}, error) {
-	var item GenericItem[interface{}]
-	err := r.store.GetItem(ctx, NewUserPK(email), NewUserSK(email), &item)
+func (r *UserRepository) Get(ctx context.Context, email string) (*models.User, error) {
+	var item GenericItem[models.User]
+	err := GetItem(ctx, r.store, NewUserPK(email), NewUserSK(email), &item)
 	if err != nil {
 		return nil, err
 	}
-	return item.Data, nil
+	return &item.Data, nil
 }
 
 // OrderRepository handles Order entity operations
@@ -54,34 +54,26 @@ func NewOrderRepository(client *dynamodb.Client, tableName string) *OrderReposit
 }
 
 // Put stores an order in DynamoDB
-func (r *OrderRepository) Put(ctx context.Context, order interface{}) error {
-	o := order.(struct {
-		OrderID   string
-		UserEmail string
-	})
-	item := GenericItem[interface{}]{
-		PK:         NewUserPK(o.UserEmail),
-		SK:         NewOrderSK(o.OrderID),
+func (r *OrderRepository) Put(ctx context.Context, order models.Order) error {
+	item := GenericItem[models.Order]{
+		PK:         NewUserPK(order.UserEmail),
+		SK:         NewOrderSK(order.OrderID),
 		EntityType: EntityOrder,
 		Data:       order,
 	}
-	return r.store.PutItem(ctx, item)
+	return PutItem(ctx, r.store, item)
 }
 
 // GetUserOrders retrieves all orders for a user from DynamoDB
-func (r *OrderRepository) GetUserOrders(ctx context.Context, userEmail string) ([]interface{}, error) {
-	items, err := r.store.Query(ctx, NewUserPK(userEmail), "ORDER#")
+func (r *OrderRepository) GetUserOrders(ctx context.Context, userEmail string) ([]models.Order, error) {
+	items, err := Query[models.Order](ctx, r.store, NewUserPK(userEmail), "ORDER#")
 	if err != nil {
 		return nil, err
 	}
 
-	var results []interface{}
-	for _, item := range items {
-		var genericItem GenericItem[interface{}]
-		if err := attributevalue.UnmarshalMap(item, &genericItem); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal item: %w", err)
-		}
-		results = append(results, genericItem.Data)
+	orders := make([]models.Order, len(items))
+	for i, item := range items {
+		orders[i] = item.Data
 	}
-	return results, nil
+	return orders, nil
 }

@@ -17,7 +17,7 @@ var (
 )
 
 // PutItem is a generic function to put any item into DynamoDB
-func (s *Store) PutItem(ctx context.Context, item interface{}) error {
+func PutItem[T any](ctx context.Context, s *Store, item GenericItem[T]) error {
 	av, err := attributevalue.MarshalMap(item)
 	if err != nil {
 		return fmt.Errorf("failed to marshal item: %w", err)
@@ -31,7 +31,7 @@ func (s *Store) PutItem(ctx context.Context, item interface{}) error {
 }
 
 // GetItem is a generic function to get any item from DynamoDB
-func (s *Store) GetItem(ctx context.Context, pk PrimaryKey, sk SortKey, out interface{}) error {
+func GetItem[T any](ctx context.Context, s *Store, pk PrimaryKey, sk SortKey, out *GenericItem[T]) error {
 	result, err := s.client.GetItem(ctx, &dynamodb.GetItemInput{
 		TableName: aws.String(s.tableName),
 		Key: map[string]types.AttributeValue{
@@ -55,7 +55,7 @@ func (s *Store) GetItem(ctx context.Context, pk PrimaryKey, sk SortKey, out inte
 }
 
 // Query is a generic function to query items from DynamoDB
-func (s *Store) Query(ctx context.Context, pk PrimaryKey, skPrefix string) ([]map[string]types.AttributeValue, error) {
+func Query[T any](ctx context.Context, s *Store, pk PrimaryKey, skPrefix string) ([]GenericItem[T], error) {
 	queryInput := &dynamodb.QueryInput{
 		TableName:              aws.String(s.tableName),
 		KeyConditionExpression: aws.String("PK = :pk AND begins_with(SK, :sk)"),
@@ -70,5 +70,14 @@ func (s *Store) Query(ctx context.Context, pk PrimaryKey, skPrefix string) ([]ma
 		return nil, fmt.Errorf("failed to query items: %w", err)
 	}
 
-	return result.Items, nil
+	var items []GenericItem[T]
+	for _, item := range result.Items {
+		var genericItem GenericItem[T]
+		if err := attributevalue.UnmarshalMap(item, &genericItem); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal item: %w", err)
+		}
+		items = append(items, genericItem)
+	}
+
+	return items, nil
 }
