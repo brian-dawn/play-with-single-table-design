@@ -51,3 +51,26 @@ func NewStore(client *dynamodb.Client, tableName string) *Store {
 		tableName: tableName,
 	}
 }
+
+// PageToken represents an opaque token for pagination
+type PageToken struct {
+	PK PrimaryKey `dynamodbav:"PK"`
+	SK SortKey    `dynamodbav:"SK"`
+}
+
+// QueryOptions contains options for querying items
+type QueryOptions struct {
+	// Limit is the maximum number of items to return
+	Limit int32
+	// PageToken is the token for getting the next page
+	PageToken *PageToken
+}
+
+// QueryResult contains the query results and pagination info
+type QueryResult[T any] struct {
+	// Items contains the query results
+	Items []GenericItem[T]
+	// NextPageToken is the token for getting the next page
+	// If nil, there are no more pages
+	NextPageToken *PageToken
+}

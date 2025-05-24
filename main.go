@@ -5,7 +5,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -71,42 +70,50 @@ func main() {
 	}
 	fmt.Println("Successfully created user:", user.Email)
 
-	// Get user from DynamoDB
-	retrievedUser, err := userRepo.Get(context.TODO(), user.Email)
-	if err != nil {
-		if errors.Is(err, datastore.ErrNotFound) {
-			fmt.Println("User not found")
-		} else {
-			log.Fatalf("failed to get user: %v", err)
+	// Create multiple orders for the user
+	for i := 1; i <= 5; i++ {
+		order := models.Order{
+			OrderID:   fmt.Sprintf("ORD%d", i),
+			UserEmail: user.Email,
+			Status:    "PENDING",
+			Total:     float64(i) * 10.99,
+			CreatedAt: time.Now(),
+			Products:  []string{fmt.Sprintf("PROD%d", i)},
 		}
-	} else {
-		fmt.Printf("Retrieved user: %+v\n", retrievedUser)
+
+		if err := orderRepo.Put(context.TODO(), order); err != nil {
+			log.Fatalf("failed to put order: %v", err)
+		}
+		fmt.Printf("Created order: %s\n", order.OrderID)
 	}
 
-	// Example: Create an order for the user
-	order := models.Order{
-		OrderID:   "ORD123",
-		UserEmail: user.Email,
-		Status:    "PENDING",
-		Total:     99.99,
-		CreatedAt: time.Now(),
-		Products:  []string{"PROD1", "PROD2"},
-	}
+	// Demonstrate pagination
+	fmt.Println("\nFetching orders with pagination (2 items per page):")
+	var pageToken *datastore.PageToken
+	pageNum := 1
 
-	// Put order in DynamoDB
-	if err := orderRepo.Put(context.TODO(), order); err != nil {
-		log.Fatalf("failed to put order: %v", err)
-	}
-	fmt.Println("Successfully created order:", order.OrderID)
+	for {
+		// Get a page of orders
+		page, err := orderRepo.GetUserOrders(context.TODO(), user.Email, &datastore.QueryOptions{
+			Limit:     2,
+			PageToken: pageToken,
+		})
+		if err != nil {
+			log.Fatalf("failed to get user orders: %v", err)
+		}
 
-	// Get all orders for the user
-	orders, err := orderRepo.GetUserOrders(context.TODO(), user.Email)
-	if err != nil {
-		log.Fatalf("failed to get user orders: %v", err)
-	}
+		fmt.Printf("\nPage %d:\n", pageNum)
+		for _, order := range page.Orders {
+			fmt.Printf("Order: %s, Total: $%.2f\n", order.OrderID, order.Total)
+		}
 
-	fmt.Printf("Found %d orders for user %s\n", len(orders), user.Email)
-	for _, order := range orders {
-		fmt.Printf("Order: %+v\n", order)
+		// If there's no next page token, we've reached the end
+		if page.NextPageToken == nil {
+			break
+		}
+
+		// Set up for next page
+		pageToken = page.NextPageToken
+		pageNum++
 	}
 }

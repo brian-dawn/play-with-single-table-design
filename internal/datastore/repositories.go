@@ -64,16 +64,29 @@ func (r *OrderRepository) Put(ctx context.Context, order models.Order) error {
 	return PutItem(ctx, r.store, item)
 }
 
-// GetUserOrders retrieves all orders for a user from DynamoDB
-func (r *OrderRepository) GetUserOrders(ctx context.Context, userEmail string) ([]models.Order, error) {
-	items, err := Query[models.Order](ctx, r.store, NewUserPK(userEmail), "ORDER#")
+// OrdersPage represents a page of orders
+type OrdersPage struct {
+	// Orders in the current page
+	Orders []models.Order
+	// NextPageToken is the token for getting the next page
+	// If nil, there are no more pages
+	NextPageToken *PageToken
+}
+
+// GetUserOrders retrieves orders for a user from DynamoDB with pagination support
+func (r *OrderRepository) GetUserOrders(ctx context.Context, userEmail string, opts *QueryOptions) (*OrdersPage, error) {
+	result, err := Query[models.Order](ctx, r.store, NewUserPK(userEmail), "ORDER#", opts)
 	if err != nil {
 		return nil, err
 	}
 
-	orders := make([]models.Order, len(items))
-	for i, item := range items {
+	orders := make([]models.Order, len(result.Items))
+	for i, item := range result.Items {
 		orders[i] = item.Data
 	}
-	return orders, nil
+
+	return &OrdersPage{
+		Orders:        orders,
+		NextPageToken: result.NextPageToken,
+	}, nil
 }

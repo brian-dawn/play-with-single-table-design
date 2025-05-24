@@ -54,8 +54,8 @@ func GetItem[T any](ctx context.Context, s *Store, pk PrimaryKey, sk SortKey, ou
 	return nil
 }
 
-// Query is a generic function to query items from DynamoDB
-func Query[T any](ctx context.Context, s *Store, pk PrimaryKey, skPrefix string) ([]GenericItem[T], error) {
+// Query is a generic function to query items from DynamoDB with pagination support
+func Query[T any](ctx context.Context, s *Store, pk PrimaryKey, skPrefix string, opts *QueryOptions) (*QueryResult[T], error) {
 	queryInput := &dynamodb.QueryInput{
 		TableName:              aws.String(s.tableName),
 		KeyConditionExpression: aws.String("PK = :pk AND begins_with(SK, :sk)"),
@@ -63,6 +63,20 @@ func Query[T any](ctx context.Context, s *Store, pk PrimaryKey, skPrefix string)
 			":pk": &types.AttributeValueMemberS{Value: string(pk)},
 			":sk": &types.AttributeValueMemberS{Value: skPrefix},
 		},
+	}
+
+	// Apply pagination options if provided
+	if opts != nil {
+		if opts.Limit > 0 {
+			queryInput.Limit = aws.Int32(opts.Limit)
+		}
+		if opts.PageToken != nil {
+			exclusiveStartKey, err := attributevalue.MarshalMap(opts.PageToken)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal page token: %w", err)
+			}
+			queryInput.ExclusiveStartKey = exclusiveStartKey
+		}
 	}
 
 	result, err := s.client.Query(ctx, queryInput)
@@ -79,5 +93,17 @@ func Query[T any](ctx context.Context, s *Store, pk PrimaryKey, skPrefix string)
 		items = append(items, genericItem)
 	}
 
-	return items, nil
+	// Handle pagination result
+	var nextPageToken *PageToken
+	if result.LastEvaluatedKey != nil {
+		nextPageToken = &PageToken{}
+		if err := attributevalue.UnmarshalMap(result.LastEvaluatedKey, nextPageToken); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal last evaluated key: %w", err)
+		}
+	}
+
+	return &QueryResult[T]{
+		Items:         items,
+		NextPageToken: nextPageToken,
+	}, nil
 }
