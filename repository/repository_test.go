@@ -6,41 +6,31 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
-	"github.com/stretchr/testify/suite"
 
 	"LearnSingleTableDesign/models"
 	"LearnSingleTableDesign/testutil"
 )
 
-// RepositoryTestSuite defines a test suite for repository tests
-type RepositoryTestSuite struct {
-	suite.Suite
-	client       *dynamodb.Client
-	tableName    string
-	userRepo     *UserRepository
-	orderRepo    *OrderRepository
-	productRepo  *ProductRepository
-	testUser     models.User
-	testOrders   []models.Order
-	testProducts []models.Product
+// testSetup creates test resources and returns cleanup function
+func testSetup(t *testing.T) (*dynamodb.Client, string, *UserRepository, *OrderRepository, *ProductRepository, func()) {
+	t.Helper()
+	client := testutil.CreateTestClient(t)
+	tableName := testutil.SetupTestTable(t, client)
+
+	userRepo := NewUserRepository(client, tableName)
+	orderRepo := NewOrderRepository(client, tableName)
+	productRepo := NewProductRepository(client, tableName)
+
+	cleanup := func() {
+		testutil.CleanupTestTable(t, client, tableName)
+	}
+
+	return client, tableName, userRepo, orderRepo, productRepo, cleanup
 }
 
-func TestRepositorySuite(t *testing.T) {
-	suite.Run(t, new(RepositoryTestSuite))
-}
-
-func (s *RepositoryTestSuite) SetupSuite() {
-	s.client = testutil.CreateTestClient(s.T())
-}
-
-func (s *RepositoryTestSuite) SetupTest() {
-	s.tableName = testutil.SetupTestTable(s.T(), s.client)
-	s.userRepo = NewUserRepository(s.client, s.tableName)
-	s.orderRepo = NewOrderRepository(s.client, s.tableName)
-	s.productRepo = NewProductRepository(s.client, s.tableName)
-
-	// Create test products
-	s.testProducts = []models.Product{
+// createTestData creates test data for use in tests
+func createTestData() (models.User, []models.Order, []models.Product) {
+	testProducts := []models.Product{
 		{
 			ProductID: "PROD1",
 			Name:      "Product 1",
@@ -59,18 +49,16 @@ func (s *RepositoryTestSuite) SetupTest() {
 		},
 	}
 
-	// Create test user
-	s.testUser = models.User{
+	testUser := models.User{
 		Email:     "test@example.com",
 		Name:      "Test User",
 		CreatedAt: time.Now(),
 	}
 
-	// Create test orders
-	s.testOrders = []models.Order{
+	testOrders := []models.Order{
 		{
 			OrderID:   "ORD1",
-			UserEmail: s.testUser.Email,
+			UserEmail: testUser.Email,
 			Status:    "PENDING",
 			Total:     99.99,
 			CreatedAt: time.Now(),
@@ -78,7 +66,7 @@ func (s *RepositoryTestSuite) SetupTest() {
 		},
 		{
 			OrderID:   "ORD2",
-			UserEmail: s.testUser.Email,
+			UserEmail: testUser.Email,
 			Status:    "COMPLETED",
 			Total:     199.99,
 			CreatedAt: time.Now(),
@@ -86,22 +74,21 @@ func (s *RepositoryTestSuite) SetupTest() {
 		},
 		{
 			OrderID:   "ORD3",
-			UserEmail: s.testUser.Email,
+			UserEmail: testUser.Email,
 			Status:    "PENDING",
 			Total:     299.99,
 			CreatedAt: time.Now(),
 			Products:  []string{"PROD4"},
 		},
 	}
+
+	return testUser, testOrders, testProducts
 }
 
-func (s *RepositoryTestSuite) TearDownTest() {
-	testutil.CleanupTestTable(s.T(), s.client, s.tableName)
-}
+func TestUserRepository_Put(t *testing.T) {
+	_, _, userRepo, _, _, cleanup := testSetup(t)
+	defer cleanup()
 
-// User Repository Tests
-
-func (s *RepositoryTestSuite) TestUserRepository_Put() {
 	tests := []struct {
 		name    string
 		user    models.User
@@ -135,28 +122,45 @@ func (s *RepositoryTestSuite) TestUserRepository_Put() {
 	}
 
 	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			err := s.userRepo.Put(context.Background(), tt.user)
-			if tt.wantErr {
-				s.Error(err)
+		t.Run(tt.name, func(t *testing.T) {
+			err := userRepo.Put(context.Background(), tt.user)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Put() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			s.NoError(err)
 
-			// Verify the user was stored correctly
-			got, err := s.userRepo.Get(context.Background(), tt.user.Email)
-			s.Require().NoError(err)
-			s.Equal(tt.user.Email, got.Email)
-			s.Equal(tt.user.Name, got.Name)
-			s.WithinDuration(tt.user.CreatedAt, got.CreatedAt, time.Second)
+			if !tt.wantErr {
+				// Verify the user was stored correctly
+				got, err := userRepo.Get(context.Background(), tt.user.Email)
+				if err != nil {
+					t.Errorf("Get() error = %v", err)
+					return
+				}
+				if got.Email != tt.user.Email {
+					t.Errorf("Email = %v, want %v", got.Email, tt.user.Email)
+				}
+				if got.Name != tt.user.Name {
+					t.Errorf("Name = %v, want %v", got.Name, tt.user.Name)
+				}
+				if got.CreatedAt.Sub(tt.user.CreatedAt) > time.Second {
+					t.Errorf("CreatedAt = %v, want %v (within 1s)", got.CreatedAt, tt.user.CreatedAt)
+				}
+			}
 		})
 	}
 }
 
-func (s *RepositoryTestSuite) TestUserRepository_Get() {
+func TestUserRepository_Get(t *testing.T) {
+	_, _, userRepo, _, _, cleanup := testSetup(t)
+	defer cleanup()
+
+	testUser, _, _ := createTestData()
+
 	// Store test user
-	err := s.userRepo.Put(context.Background(), s.testUser)
-	s.Require().NoError(err)
+	err := userRepo.Put(context.Background(), testUser)
+	if err != nil {
+		t.Fatalf("Failed to put test user: %v", err)
+	}
 
 	tests := []struct {
 		name    string
@@ -166,11 +170,11 @@ func (s *RepositoryTestSuite) TestUserRepository_Get() {
 	}{
 		{
 			name:  "existing user",
-			email: s.testUser.Email,
+			email: testUser.Email,
 			want: &models.User{
-				Email:     s.testUser.Email,
-				Name:      s.testUser.Name,
-				CreatedAt: s.testUser.CreatedAt,
+				Email:     testUser.Email,
+				Name:      testUser.Name,
+				CreatedAt: testUser.CreatedAt,
 			},
 			wantErr: false,
 		},
@@ -183,44 +187,75 @@ func (s *RepositoryTestSuite) TestUserRepository_Get() {
 	}
 
 	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			got, err := s.userRepo.Get(context.Background(), tt.email)
-			if tt.wantErr {
-				s.Error(err)
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := userRepo.Get(context.Background(), tt.email)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Get() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-
-			s.Require().NoError(err)
-			s.Equal(tt.want.Email, got.Email)
-			s.Equal(tt.want.Name, got.Name)
-			s.WithinDuration(tt.want.CreatedAt, got.CreatedAt, time.Second)
+			if !tt.wantErr {
+				if got.Email != tt.want.Email {
+					t.Errorf("Email = %v, want %v", got.Email, tt.want.Email)
+				}
+				if got.Name != tt.want.Name {
+					t.Errorf("Name = %v, want %v", got.Name, tt.want.Name)
+				}
+				if got.CreatedAt.Sub(tt.want.CreatedAt) > time.Second {
+					t.Errorf("CreatedAt = %v, want %v (within 1s)", got.CreatedAt, tt.want.CreatedAt)
+				}
+			}
 		})
 	}
 }
 
-// Product Repository Tests
-func (s *RepositoryTestSuite) TestProductRepository_Put() {
-	// For each product perform put
-	for _, product := range s.testProducts {
-		err := s.productRepo.Put(context.Background(), product)
-		s.Require().NoError(err)
-	}
+func TestProductRepository_Put(t *testing.T) {
+	_, _, _, _, productRepo, cleanup := testSetup(t)
+	defer cleanup()
 
-	// Make sure we can get as well.
-	for _, product := range s.testProducts {
-		got, err := s.productRepo.Get(context.Background(), product.ProductID)
-		s.Require().NoError(err)
-		s.Equal(product.ProductID, got.ProductID)
-		s.Equal(product.Name, got.Name)
-		s.Equal(product.Category, got.Category)
-		s.Equal(product.Price, got.Price)
-		s.Equal(product.Stock, got.Stock)
-		s.WithinDuration(product.CreatedAt, got.CreatedAt, time.Second)
+	_, _, testProducts := createTestData()
+
+	// For each product perform put
+	for _, product := range testProducts {
+		err := productRepo.Put(context.Background(), product)
+		if err != nil {
+			t.Errorf("Put() error = %v", err)
+			continue
+		}
+
+		// Make sure we can get as well
+		got, err := productRepo.Get(context.Background(), product.ProductID)
+		if err != nil {
+			t.Errorf("Get() error = %v", err)
+			continue
+		}
+
+		if got.ProductID != product.ProductID {
+			t.Errorf("ProductID = %v, want %v", got.ProductID, product.ProductID)
+		}
+		if got.Name != product.Name {
+			t.Errorf("Name = %v, want %v", got.Name, product.Name)
+		}
+		if got.Category != product.Category {
+			t.Errorf("Category = %v, want %v", got.Category, product.Category)
+		}
+		if got.Price != product.Price {
+			t.Errorf("Price = %v, want %v", got.Price, product.Price)
+		}
+		if got.Stock != product.Stock {
+			t.Errorf("Stock = %v, want %v", got.Stock, product.Stock)
+		}
+		if got.CreatedAt.Sub(product.CreatedAt) > time.Second {
+			t.Errorf("CreatedAt = %v, want %v (within 1s)", got.CreatedAt, product.CreatedAt)
+		}
 	}
 }
 
-// Order Repository Tests
-func (s *RepositoryTestSuite) TestOrderRepository_Put() {
+func TestOrderRepository_Put(t *testing.T) {
+	_, _, _, orderRepo, _, cleanup := testSetup(t)
+	defer cleanup()
+
+	_, testOrders, _ := createTestData()
+
 	tests := []struct {
 		name    string
 		order   models.Order
@@ -228,7 +263,7 @@ func (s *RepositoryTestSuite) TestOrderRepository_Put() {
 	}{
 		{
 			name:    "valid order",
-			order:   s.testOrders[0],
+			order:   testOrders[0],
 			wantErr: false,
 		},
 		{
@@ -256,22 +291,27 @@ func (s *RepositoryTestSuite) TestOrderRepository_Put() {
 	}
 
 	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			err := s.orderRepo.Put(context.Background(), tt.order)
-			if tt.wantErr {
-				s.Error(err)
-				return
+		t.Run(tt.name, func(t *testing.T) {
+			err := orderRepo.Put(context.Background(), tt.order)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Put() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			s.NoError(err)
 		})
 	}
 }
 
-func (s *RepositoryTestSuite) TestOrderRepository_GetUserOrders() {
+func TestOrderRepository_GetUserOrders(t *testing.T) {
+	_, _, _, orderRepo, _, cleanup := testSetup(t)
+	defer cleanup()
+
+	testUser, testOrders, _ := createTestData()
+
 	// Store test orders
-	for _, order := range s.testOrders {
-		err := s.orderRepo.Put(context.Background(), order)
-		s.Require().NoError(err)
+	for _, order := range testOrders {
+		err := orderRepo.Put(context.Background(), order)
+		if err != nil {
+			t.Fatalf("Failed to put test order: %v", err)
+		}
 	}
 
 	tests := []struct {
@@ -284,14 +324,14 @@ func (s *RepositoryTestSuite) TestOrderRepository_GetUserOrders() {
 	}{
 		{
 			name:      "get all orders",
-			userEmail: s.testUser.Email,
+			userEmail: testUser.Email,
 			opts:      nil,
 			wantCount: 3,
 			wantErr:   false,
 		},
 		{
 			name:      "get orders with pagination",
-			userEmail: s.testUser.Email,
+			userEmail: testUser.Email,
 			opts: &QueryOptions{
 				Limit: 2,
 			},
@@ -309,25 +349,39 @@ func (s *RepositoryTestSuite) TestOrderRepository_GetUserOrders() {
 	}
 
 	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			result, err := s.orderRepo.GetUserOrders(context.Background(), tt.userEmail, tt.opts)
-			if tt.wantErr {
-				s.Error(err)
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := orderRepo.GetUserOrders(context.Background(), tt.userEmail, tt.opts)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetUserOrders() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 
-			s.Require().NoError(err)
-			s.Len(result.Orders, tt.wantCount)
-			s.Equal(tt.wantNextToken, result.NextPageToken != nil)
+			if len(result.Orders) != tt.wantCount {
+				t.Errorf("Got %d orders, want %d", len(result.Orders), tt.wantCount)
+			}
+
+			if (result.NextPageToken != nil) != tt.wantNextToken {
+				t.Errorf("NextPageToken = %v, want %v", result.NextPageToken != nil, tt.wantNextToken)
+			}
 
 			// Verify order fields
 			if tt.wantCount > 0 {
 				for _, order := range result.Orders {
-					s.Equal(tt.userEmail, order.UserEmail)
-					s.NotEmpty(order.OrderID)
-					s.NotEmpty(order.Status)
-					s.Greater(order.Total, float64(0))
-					s.NotEmpty(order.Products)
+					if order.UserEmail != tt.userEmail {
+						t.Errorf("UserEmail = %v, want %v", order.UserEmail, tt.userEmail)
+					}
+					if order.OrderID == "" {
+						t.Error("OrderID is empty")
+					}
+					if order.Status == "" {
+						t.Error("Status is empty")
+					}
+					if order.Total <= 0 {
+						t.Error("Total is not positive")
+					}
+					if len(order.Products) == 0 {
+						t.Error("Products is empty")
+					}
 				}
 			}
 		})
