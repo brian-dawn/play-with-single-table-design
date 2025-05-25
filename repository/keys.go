@@ -15,8 +15,8 @@ func NewOrderSK(orderID string) SortKey {
 	return SortKey(fmt.Sprintf("ORDER#%s", orderID))
 }
 
-func NewOrderPK(category string) PrimaryKey {
-	return PrimaryKey(fmt.Sprintf("CATEGORY#%s", category))
+func NewCategoryPK() PrimaryKey {
+	return PrimaryKey("PRODUCT#ALL")
 }
 
 func NewProductSK(productID string) SortKey {
