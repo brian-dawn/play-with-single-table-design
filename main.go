@@ -13,10 +13,10 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 
-	"LearnSingleTableDesign/internal/datastore"
-	"LearnSingleTableDesign/internal/db"
-	"LearnSingleTableDesign/internal/models"
+	"LearnSingleTableDesign/models"
+	"LearnSingleTableDesign/repository"
 )
 
 func main() {
@@ -49,11 +49,11 @@ func main() {
 
 	// Create repositories
 	tableName := "AppTable"
-	userRepo := datastore.NewUserRepository(client, tableName)
-	orderRepo := datastore.NewOrderRepository(client, tableName)
+	userRepo := repository.NewUserRepository(client, tableName)
+	orderRepo := repository.NewOrderRepository(client, tableName)
 
 	// Ensure the table exists before proceeding
-	if err := db.EnsureTableExists(context.TODO(), client, tableName); err != nil {
+	if err := ensureTableExists(context.TODO(), client, tableName); err != nil {
 		log.Fatalf("failed to ensure table exists: %v", err)
 	}
 
@@ -89,12 +89,12 @@ func main() {
 
 	// Demonstrate pagination
 	fmt.Println("\nFetching orders with pagination (2 items per page):")
-	var pageToken *datastore.PageToken
+	var pageToken *repository.PageToken
 	pageNum := 1
 
 	for {
 		// Get a page of orders
-		page, err := orderRepo.GetUserOrders(context.TODO(), user.Email, &datastore.QueryOptions{
+		page, err := orderRepo.GetUserOrders(context.TODO(), user.Email, &repository.QueryOptions{
 			Limit:     2,
 			PageToken: pageToken,
 		})
@@ -116,4 +116,43 @@ func main() {
 		pageToken = page.NextPageToken
 		pageNum++
 	}
+}
+
+// ensureTableExists creates the DynamoDB table if it doesn't exist
+func ensureTableExists(ctx context.Context, client *dynamodb.Client, tableName string) error {
+	_, err := client.DescribeTable(ctx, &dynamodb.DescribeTableInput{
+		TableName: aws.String(tableName),
+	})
+	if err == nil {
+		// Table exists
+		return nil
+	}
+
+	// Create table
+	_, err = client.CreateTable(ctx, &dynamodb.CreateTableInput{
+		TableName: aws.String(tableName),
+		AttributeDefinitions: []types.AttributeDefinition{
+			{
+				AttributeName: aws.String("PK"),
+				AttributeType: types.ScalarAttributeTypeS,
+			},
+			{
+				AttributeName: aws.String("SK"),
+				AttributeType: types.ScalarAttributeTypeS,
+			},
+		},
+		KeySchema: []types.KeySchemaElement{
+			{
+				AttributeName: aws.String("PK"),
+				KeyType:       types.KeyTypeHash,
+			},
+			{
+				AttributeName: aws.String("SK"),
+				KeyType:       types.KeyTypeRange,
+			},
+		},
+		BillingMode: types.BillingModePayPerRequest,
+	})
+
+	return err
 }

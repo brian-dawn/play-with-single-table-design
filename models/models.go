@@ -49,3 +49,30 @@ func (o Order) Validate() error {
 	}
 	return nil
 }
+
+type Product struct {
+	ProductID string  `json:"product_id" dynamodbav:"product_id"`
+	Category  string  `json:"category" dynamodbav:"category"`
+	Name      string  `json:"name" dynamodbav:"name"`
+	Price     float64 `json:"price" dynamodbav:"price"`
+	Stock     int     `json:"stock" dynamodbav:"stock"`
+}
+
+func (p Product) Validate() error {
+	if p.ProductID == "" {
+		return errors.New("product_id is required")
+	}
+	if p.Category == "" {
+		return errors.New("category is required")
+	}
+	if p.Name == "" {
+		return errors.New("name is required")
+	}
+	if p.Price <= 0 {
+		return errors.New("price is required")
+	}
+	if p.Stock < 0 {
+		return errors.New("stock can't be less than 0")
+	}
+	return nil
+}

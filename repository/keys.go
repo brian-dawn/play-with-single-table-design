@@ -14,3 +14,11 @@ func NewUserSK(email string) SortKey {
 func NewOrderSK(orderID string) SortKey {
 	return SortKey(fmt.Sprintf("ORDER#%s", orderID))
 }
+
+func NewOrderPK(category string) PrimaryKey {
+	return PrimaryKey(fmt.Sprintf("CATEGORY#%s", category))
+}
+
+func NewProductSK(productID string) SortKey {
+	return SortKey(fmt.Sprintf("PRODUCT#%s", productID))
+}
