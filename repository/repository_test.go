@@ -15,12 +15,14 @@ import (
 // RepositoryTestSuite defines a test suite for repository tests
 type RepositoryTestSuite struct {
 	suite.Suite
-	client     *dynamodb.Client
-	tableName  string
-	userRepo   *UserRepository
-	orderRepo  *OrderRepository
-	testUser   models.User
-	testOrders []models.Order
+	client       *dynamodb.Client
+	tableName    string
+	userRepo     *UserRepository
+	orderRepo    *OrderRepository
+	productRepo  *ProductRepository
+	testUser     models.User
+	testOrders   []models.Order
+	testProducts []models.Product
 }
 
 func TestRepositorySuite(t *testing.T) {
@@ -35,6 +37,27 @@ func (s *RepositoryTestSuite) SetupTest() {
 	s.tableName = testutil.SetupTestTable(s.T(), s.client)
 	s.userRepo = NewUserRepository(s.client, s.tableName)
 	s.orderRepo = NewOrderRepository(s.client, s.tableName)
+	s.productRepo = NewProductRepository(s.client, s.tableName)
+
+	// Create test products
+	s.testProducts = []models.Product{
+		{
+			ProductID: "PROD1",
+			Name:      "Product 1",
+			Category:  "Electronics",
+			Price:     100.00,
+			Stock:     100,
+			CreatedAt: time.Now(),
+		},
+		{
+			ProductID: "PROD2",
+			Name:      "Product 2",
+			Category:  "Electronics",
+			Price:     200.00,
+			Stock:     100,
+			CreatedAt: time.Now(),
+		},
+	}
 
 	// Create test user
 	s.testUser = models.User{
@@ -175,8 +198,28 @@ func (s *RepositoryTestSuite) TestUserRepository_Get() {
 	}
 }
 
-// Order Repository Tests
+// Product Repository Tests
+func (s *RepositoryTestSuite) TestProductRepository_Put() {
+	// For each product perform put
+	for _, product := range s.testProducts {
+		err := s.productRepo.Put(context.Background(), product)
+		s.Require().NoError(err)
+	}
 
+	// Make sure we can get as well.
+	for _, product := range s.testProducts {
+		got, err := s.productRepo.Get(context.Background(), product.ProductID)
+		s.Require().NoError(err)
+		s.Equal(product.ProductID, got.ProductID)
+		s.Equal(product.Name, got.Name)
+		s.Equal(product.Category, got.Category)
+		s.Equal(product.Price, got.Price)
+		s.Equal(product.Stock, got.Stock)
+		s.WithinDuration(product.CreatedAt, got.CreatedAt, time.Second)
+	}
+}
+
+// Order Repository Tests
 func (s *RepositoryTestSuite) TestOrderRepository_Put() {
 	tests := []struct {
 		name    string

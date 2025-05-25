@@ -51,11 +51,12 @@ func (o Order) Validate() error {
 }
 
 type Product struct {
-	ProductID string  `json:"product_id" dynamodbav:"product_id"`
-	Category  string  `json:"category" dynamodbav:"category"`
-	Name      string  `json:"name" dynamodbav:"name"`
-	Price     float64 `json:"price" dynamodbav:"price"`
-	Stock     int     `json:"stock" dynamodbav:"stock"`
+	ProductID string    `json:"product_id" dynamodbav:"product_id"`
+	Category  string    `json:"category" dynamodbav:"category"`
+	Name      string    `json:"name" dynamodbav:"name"`
+	Price     float64   `json:"price" dynamodbav:"price"`
+	Stock     int       `json:"stock" dynamodbav:"stock"`
+	CreatedAt time.Time `json:"created_at" dynamodbav:"created_at"`
 }
 
 func (p Product) Validate() error {
