@@ -12,19 +12,19 @@ A Go application demonstrating single table design patterns with DynamoDB.
 
 Run tests:
 
-  make test
+    make test
 
 Code coverage:
 
-  make test-coverage
+    make test-coverage
 
 Build:
 
-  make build
+    make build
 
 Run:
 
-  make run
+    make run
   
 We host a local dynamodb instance with an admin panel that can be accessedd at:
 
