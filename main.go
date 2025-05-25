@@ -75,7 +75,7 @@ func main() {
 		order := models.Order{
 			OrderID:   fmt.Sprintf("ORD%d", i),
 			UserEmail: user.Email,
-			Status:    "PENDING",
+			Status:    models.OrderStatusPending,
 			Total:     float64(i) * 10.99,
 			CreatedAt: time.Now(),
 			Products:  []string{fmt.Sprintf("PROD%d", i)},
