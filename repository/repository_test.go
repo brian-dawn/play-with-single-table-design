@@ -59,7 +59,7 @@ func createTestData() (models.User, []models.Order, []models.Product) {
 		{
 			OrderID:   "ORD1",
 			UserEmail: testUser.Email,
-			Status:    "PENDING",
+			Status:    models.OrderStatusPending,
 			Total:     99.99,
 			CreatedAt: time.Now(),
 			Products:  []string{"PROD1"},
@@ -67,7 +67,7 @@ func createTestData() (models.User, []models.Order, []models.Product) {
 		{
 			OrderID:   "ORD2",
 			UserEmail: testUser.Email,
-			Status:    "COMPLETED",
+			Status:    models.OrderStatusCompleted,
 			Total:     199.99,
 			CreatedAt: time.Now(),
 			Products:  []string{"PROD2", "PROD3"},
@@ -75,7 +75,7 @@ func createTestData() (models.User, []models.Order, []models.Product) {
 		{
 			OrderID:   "ORD3",
 			UserEmail: testUser.Email,
-			Status:    "PENDING",
+			Status:    models.OrderStatusPending,
 			Total:     299.99,
 			CreatedAt: time.Now(),
 			Products:  []string{"PROD4"},
@@ -232,7 +232,7 @@ func TestOrderRepository_Put(t *testing.T) {
 	order := models.Order{
 		OrderID:   "ORD1",
 		UserEmail: "test@example.com",
-		Status:    "PENDING",
+		Status:    models.OrderStatusPending,
 		Total:     99.99,
 		CreatedAt: time.Now(),
 		Products:  []string{"PROD1"},
@@ -246,10 +246,10 @@ func TestOrderRepository_Put(t *testing.T) {
 	// Test putting an invalid order (missing order ID)
 	invalidOrder := models.Order{
 		UserEmail: "test@example.com",
-		Status:    "PENDING",
+		Status:    models.OrderStatusPending,
 		Total:     99.99,
-		CreatedAt: time.Now(),
 		Products:  []string{"PROD1"},
+		CreatedAt: time.Now(),
 	}
 
 	err = orderRepo.Put(context.Background(), invalidOrder)
@@ -257,18 +257,19 @@ func TestOrderRepository_Put(t *testing.T) {
 		t.Error("Expected error when putting order with missing order ID, got nil")
 	}
 
-	// Test putting an invalid order (missing user email)
+	// Test putting an invalid order (invalid status)
 	invalidOrder = models.Order{
-		OrderID:   "ORD123",
-		Status:    "PENDING",
+		OrderID:   "ORD2",
+		UserEmail: "test@example.com",
+		Status:    "INVALID_STATUS",
 		Total:     99.99,
-		CreatedAt: time.Now(),
 		Products:  []string{"PROD1"},
+		CreatedAt: time.Now(),
 	}
 
 	err = orderRepo.Put(context.Background(), invalidOrder)
 	if err == nil {
-		t.Error("Expected error when putting order with missing user email, got nil")
+		t.Error("Expected error when putting order with invalid status, got nil")
 	}
 }
 
@@ -283,7 +284,7 @@ func TestOrderRepository_GetUserOrders(t *testing.T) {
 		{
 			OrderID:   "ORD1",
 			UserEmail: userEmail,
-			Status:    "PENDING",
+			Status:    models.OrderStatusPending,
 			Total:     99.99,
 			CreatedAt: time.Now(),
 			Products:  []string{"PROD1"},
@@ -291,7 +292,7 @@ func TestOrderRepository_GetUserOrders(t *testing.T) {
 		{
 			OrderID:   "ORD2",
 			UserEmail: userEmail,
-			Status:    "COMPLETED",
+			Status:    models.OrderStatusCompleted,
 			Total:     199.99,
 			CreatedAt: time.Now(),
 			Products:  []string{"PROD2", "PROD3"},
@@ -299,7 +300,7 @@ func TestOrderRepository_GetUserOrders(t *testing.T) {
 		{
 			OrderID:   "ORD3",
 			UserEmail: userEmail,
-			Status:    "PENDING",
+			Status:    models.OrderStatusPending,
 			Total:     299.99,
 			CreatedAt: time.Now(),
 			Products:  []string{"PROD4"},
