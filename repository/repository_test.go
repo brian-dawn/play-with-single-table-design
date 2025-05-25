@@ -1,4 +1,4 @@
-package tests
+package repository
 
 import (
 	"context"
@@ -8,9 +8,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/stretchr/testify/suite"
 
-	"LearnSingleTableDesign/internal/datastore"
-	"LearnSingleTableDesign/internal/models"
-	"LearnSingleTableDesign/internal/testutil"
+	"LearnSingleTableDesign/models"
+	"LearnSingleTableDesign/testutil"
 )
 
 // RepositoryTestSuite defines a test suite for repository tests
@@ -18,8 +17,8 @@ type RepositoryTestSuite struct {
 	suite.Suite
 	client     *dynamodb.Client
 	tableName  string
-	userRepo   *datastore.UserRepository
-	orderRepo  *datastore.OrderRepository
+	userRepo   *UserRepository
+	orderRepo  *OrderRepository
 	testUser   models.User
 	testOrders []models.Order
 }
@@ -34,8 +33,8 @@ func (s *RepositoryTestSuite) SetupSuite() {
 
 func (s *RepositoryTestSuite) SetupTest() {
 	s.tableName = testutil.SetupTestTable(s.T(), s.client)
-	s.userRepo = datastore.NewUserRepository(s.client, s.tableName)
-	s.orderRepo = datastore.NewOrderRepository(s.client, s.tableName)
+	s.userRepo = NewUserRepository(s.client, s.tableName)
+	s.orderRepo = NewOrderRepository(s.client, s.tableName)
 
 	// Create test user
 	s.testUser = models.User{
@@ -235,7 +234,7 @@ func (s *RepositoryTestSuite) TestOrderRepository_GetUserOrders() {
 	tests := []struct {
 		name          string
 		userEmail     string
-		opts          *datastore.QueryOptions
+		opts          *QueryOptions
 		wantCount     int
 		wantNextToken bool
 		wantErr       bool
@@ -250,7 +249,7 @@ func (s *RepositoryTestSuite) TestOrderRepository_GetUserOrders() {
 		{
 			name:      "get orders with pagination",
 			userEmail: s.testUser.Email,
-			opts: &datastore.QueryOptions{
+			opts: &QueryOptions{
 				Limit: 2,
 			},
 			wantCount:     2,
