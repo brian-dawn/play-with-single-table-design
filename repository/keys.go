@@ -2,23 +2,27 @@ package repository
 
 import "fmt"
 
+type KeyFactory struct{}
+
+var Key = KeyFactory{}
+
 // Key constructors
-func NewUserPK(email string) PrimaryKey {
+func (KeyFactory) NewUserPK(email string) PrimaryKey {
 	return PrimaryKey(fmt.Sprintf("USER#%s", email))
 }
 
-func NewUserSK(email string) SortKey {
+func (KeyFactory) NewUserSK(email string) SortKey {
 	return SortKey(fmt.Sprintf("PROFILE#%s", email))
 }
 
-func NewOrderSK(orderID string) SortKey {
+func (KeyFactory) NewOrderSK(orderID string) SortKey {
 	return SortKey(fmt.Sprintf("ORDER#%s", orderID))
 }
 
-func NewCategoryPK() PrimaryKey {
+func (KeyFactory) NewProductPK() PrimaryKey {
 	return PrimaryKey("PRODUCT#ALL")
 }
 
-func NewProductSK(productID string) SortKey {
+func (KeyFactory) NewProductSK(productID string) SortKey {
 	return SortKey(fmt.Sprintf("PRODUCT#%s", productID))
 }

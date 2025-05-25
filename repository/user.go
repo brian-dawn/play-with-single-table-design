@@ -26,8 +26,8 @@ func (r *UserRepository) Put(ctx context.Context, user models.User) error {
 		return err
 	}
 	item := GenericItem[models.User]{
-		PK:         NewUserPK(user.Email),
-		SK:         NewUserSK(user.Email),
+		PK:         Key.NewUserPK(user.Email),
+		SK:         Key.NewUserSK(user.Email),
 		EntityType: EntityUser,
 		Data:       user,
 	}
@@ -37,7 +37,7 @@ func (r *UserRepository) Put(ctx context.Context, user models.User) error {
 // Get retrieves a user from DynamoDB
 func (r *UserRepository) Get(ctx context.Context, email string) (*models.User, error) {
 	var item GenericItem[models.User]
-	err := GetItem(ctx, r.store, NewUserPK(email), NewUserSK(email), &item)
+	err := GetItem(ctx, r.store, Key.NewUserPK(email), Key.NewUserSK(email), &item)
 	if err != nil {
 		return nil, err
 	}
