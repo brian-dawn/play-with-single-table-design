@@ -22,6 +22,9 @@ func NewUserRepository(client *dynamodb.Client, tableName string) *UserRepositor
 
 // Put stores a user in DynamoDB
 func (r *UserRepository) Put(ctx context.Context, user models.User) error {
+	if err := user.Validate(); err != nil {
+		return err
+	}
 	item := GenericItem[models.User]{
 		PK:         NewUserPK(user.Email),
 		SK:         NewUserSK(user.Email),
@@ -55,6 +58,9 @@ func NewOrderRepository(client *dynamodb.Client, tableName string) *OrderReposit
 
 // Put stores an order in DynamoDB
 func (r *OrderRepository) Put(ctx context.Context, order models.Order) error {
+	if err := order.Validate(); err != nil {
+		return err
+	}
 	item := GenericItem[models.Order]{
 		PK:         NewUserPK(order.UserEmail),
 		SK:         NewOrderSK(order.OrderID),
