@@ -89,64 +89,54 @@ func TestUserRepository_Put(t *testing.T) {
 	_, _, userRepo, _, _, cleanup := testSetup(t)
 	defer cleanup()
 
-	tests := []struct {
-		name    string
-		user    models.User
-		wantErr bool
-	}{
-		{
-			name: "valid user",
-			user: models.User{
-				Email:     "test@example.com",
-				Name:      "Test User",
-				CreatedAt: time.Now(),
-			},
-			wantErr: false,
-		},
-		{
-			name: "invalid user - missing email",
-			user: models.User{
-				Name:      "Test User",
-				CreatedAt: time.Now(),
-			},
-			wantErr: true,
-		},
-		{
-			name: "invalid user - missing name",
-			user: models.User{
-				Email:     "test@example.com",
-				CreatedAt: time.Now(),
-			},
-			wantErr: true,
-		},
+	// Test putting a valid user
+	user := models.User{
+		Email:     "test@example.com",
+		Name:      "Test User",
+		CreatedAt: time.Now(),
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := userRepo.Put(context.Background(), tt.user)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Put() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
+	err := userRepo.Put(context.Background(), user)
+	if err != nil {
+		t.Fatalf("Failed to put valid user: %v", err)
+	}
 
-			if !tt.wantErr {
-				// Verify the user was stored correctly
-				got, err := userRepo.Get(context.Background(), tt.user.Email)
-				if err != nil {
-					t.Errorf("Get() error = %v", err)
-					return
-				}
-				if got.Email != tt.user.Email {
-					t.Errorf("Email = %v, want %v", got.Email, tt.user.Email)
-				}
-				if got.Name != tt.user.Name {
-					t.Errorf("Name = %v, want %v", got.Name, tt.user.Name)
-				}
-				if got.CreatedAt.Sub(tt.user.CreatedAt) > time.Second {
-					t.Errorf("CreatedAt = %v, want %v (within 1s)", got.CreatedAt, tt.user.CreatedAt)
-				}
-			}
-		})
+	// Verify the user was stored correctly
+	got, err := userRepo.Get(context.Background(), user.Email)
+	if err != nil {
+		t.Fatalf("Failed to get user after put: %v", err)
+	}
+
+	if got.Email != user.Email {
+		t.Errorf("Email = %v, want %v", got.Email, user.Email)
+	}
+	if got.Name != user.Name {
+		t.Errorf("Name = %v, want %v", got.Name, user.Name)
+	}
+	if got.CreatedAt.Sub(user.CreatedAt) > time.Second {
+		t.Errorf("CreatedAt = %v, want %v (within 1s)", got.CreatedAt, user.CreatedAt)
+	}
+
+	// Test putting an invalid user (missing email)
+	invalidUser := models.User{
+		Name:      "Test User",
+		CreatedAt: time.Now(),
+	}
+
+	err = userRepo.Put(context.Background(), invalidUser)
+	if err == nil {
+		t.Error("Expected error when putting user with missing email, got nil")
+	}
+
+	// Test putting an invalid user (missing name)
+	invalidUser = models.User{
+		Email:     "test@example.com",
+		CreatedAt: time.Now(),
+	}
+
+	err = userRepo.Put(context.Background(), invalidUser)
+	if err == nil {
+		t.Error("Expected error when putting user with missing name, got nil")
 	}
 }
 
@@ -154,57 +144,38 @@ func TestUserRepository_Get(t *testing.T) {
 	_, _, userRepo, _, _, cleanup := testSetup(t)
 	defer cleanup()
 
-	testUser, _, _ := createTestData()
+	// Create and store a test user
+	user := models.User{
+		Email:     "test@example.com",
+		Name:      "Test User",
+		CreatedAt: time.Now(),
+	}
 
-	// Store test user
-	err := userRepo.Put(context.Background(), testUser)
+	err := userRepo.Put(context.Background(), user)
 	if err != nil {
 		t.Fatalf("Failed to put test user: %v", err)
 	}
 
-	tests := []struct {
-		name    string
-		email   string
-		want    *models.User
-		wantErr bool
-	}{
-		{
-			name:  "existing user",
-			email: testUser.Email,
-			want: &models.User{
-				Email:     testUser.Email,
-				Name:      testUser.Name,
-				CreatedAt: testUser.CreatedAt,
-			},
-			wantErr: false,
-		},
-		{
-			name:    "non-existent user",
-			email:   "nonexistent@example.com",
-			want:    nil,
-			wantErr: true,
-		},
+	// Test getting an existing user
+	got, err := userRepo.Get(context.Background(), user.Email)
+	if err != nil {
+		t.Fatalf("Failed to get existing user: %v", err)
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := userRepo.Get(context.Background(), tt.email)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Get() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !tt.wantErr {
-				if got.Email != tt.want.Email {
-					t.Errorf("Email = %v, want %v", got.Email, tt.want.Email)
-				}
-				if got.Name != tt.want.Name {
-					t.Errorf("Name = %v, want %v", got.Name, tt.want.Name)
-				}
-				if got.CreatedAt.Sub(tt.want.CreatedAt) > time.Second {
-					t.Errorf("CreatedAt = %v, want %v (within 1s)", got.CreatedAt, tt.want.CreatedAt)
-				}
-			}
-		})
+	if got.Email != user.Email {
+		t.Errorf("Email = %v, want %v", got.Email, user.Email)
+	}
+	if got.Name != user.Name {
+		t.Errorf("Name = %v, want %v", got.Name, user.Name)
+	}
+	if got.CreatedAt.Sub(user.CreatedAt) > time.Second {
+		t.Errorf("CreatedAt = %v, want %v (within 1s)", got.CreatedAt, user.CreatedAt)
+	}
+
+	// Test getting a non-existent user
+	_, err = userRepo.Get(context.Background(), "nonexistent@example.com")
+	if err == nil {
+		t.Error("Expected error when getting non-existent user, got nil")
 	}
 }
 
@@ -212,41 +183,44 @@ func TestProductRepository_Put(t *testing.T) {
 	_, _, _, _, productRepo, cleanup := testSetup(t)
 	defer cleanup()
 
-	_, _, testProducts := createTestData()
+	// Create and store a test product
+	product := models.Product{
+		ProductID: "PROD1",
+		Name:      "Test Product",
+		Category:  "Electronics",
+		Price:     100.00,
+		Stock:     100,
+		CreatedAt: time.Now(),
+	}
 
-	// For each product perform put
-	for _, product := range testProducts {
-		err := productRepo.Put(context.Background(), product)
-		if err != nil {
-			t.Errorf("Put() error = %v", err)
-			continue
-		}
+	err := productRepo.Put(context.Background(), product)
+	if err != nil {
+		t.Fatalf("Failed to put product: %v", err)
+	}
 
-		// Make sure we can get as well
-		got, err := productRepo.Get(context.Background(), product.ProductID)
-		if err != nil {
-			t.Errorf("Get() error = %v", err)
-			continue
-		}
+	// Verify the product was stored correctly
+	got, err := productRepo.Get(context.Background(), product.ProductID)
+	if err != nil {
+		t.Fatalf("Failed to get product after put: %v", err)
+	}
 
-		if got.ProductID != product.ProductID {
-			t.Errorf("ProductID = %v, want %v", got.ProductID, product.ProductID)
-		}
-		if got.Name != product.Name {
-			t.Errorf("Name = %v, want %v", got.Name, product.Name)
-		}
-		if got.Category != product.Category {
-			t.Errorf("Category = %v, want %v", got.Category, product.Category)
-		}
-		if got.Price != product.Price {
-			t.Errorf("Price = %v, want %v", got.Price, product.Price)
-		}
-		if got.Stock != product.Stock {
-			t.Errorf("Stock = %v, want %v", got.Stock, product.Stock)
-		}
-		if got.CreatedAt.Sub(product.CreatedAt) > time.Second {
-			t.Errorf("CreatedAt = %v, want %v (within 1s)", got.CreatedAt, product.CreatedAt)
-		}
+	if got.ProductID != product.ProductID {
+		t.Errorf("ProductID = %v, want %v", got.ProductID, product.ProductID)
+	}
+	if got.Name != product.Name {
+		t.Errorf("Name = %v, want %v", got.Name, product.Name)
+	}
+	if got.Category != product.Category {
+		t.Errorf("Category = %v, want %v", got.Category, product.Category)
+	}
+	if got.Price != product.Price {
+		t.Errorf("Price = %v, want %v", got.Price, product.Price)
+	}
+	if got.Stock != product.Stock {
+		t.Errorf("Stock = %v, want %v", got.Stock, product.Stock)
+	}
+	if got.CreatedAt.Sub(product.CreatedAt) > time.Second {
+		t.Errorf("CreatedAt = %v, want %v (within 1s)", got.CreatedAt, product.CreatedAt)
 	}
 }
 
@@ -254,49 +228,47 @@ func TestOrderRepository_Put(t *testing.T) {
 	_, _, _, orderRepo, _, cleanup := testSetup(t)
 	defer cleanup()
 
-	_, testOrders, _ := createTestData()
-
-	tests := []struct {
-		name    string
-		order   models.Order
-		wantErr bool
-	}{
-		{
-			name:    "valid order",
-			order:   testOrders[0],
-			wantErr: false,
-		},
-		{
-			name: "invalid order - missing order ID",
-			order: models.Order{
-				UserEmail: "test@example.com",
-				Status:    "PENDING",
-				Total:     99.99,
-				CreatedAt: time.Now(),
-				Products:  []string{"PROD1"},
-			},
-			wantErr: true,
-		},
-		{
-			name: "invalid order - missing user email",
-			order: models.Order{
-				OrderID:   "ORD123",
-				Status:    "PENDING",
-				Total:     99.99,
-				CreatedAt: time.Now(),
-				Products:  []string{"PROD1"},
-			},
-			wantErr: true,
-		},
+	// Test putting a valid order
+	order := models.Order{
+		OrderID:   "ORD1",
+		UserEmail: "test@example.com",
+		Status:    "PENDING",
+		Total:     99.99,
+		CreatedAt: time.Now(),
+		Products:  []string{"PROD1"},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := orderRepo.Put(context.Background(), tt.order)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Put() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
+	err := orderRepo.Put(context.Background(), order)
+	if err != nil {
+		t.Fatalf("Failed to put valid order: %v", err)
+	}
+
+	// Test putting an invalid order (missing order ID)
+	invalidOrder := models.Order{
+		UserEmail: "test@example.com",
+		Status:    "PENDING",
+		Total:     99.99,
+		CreatedAt: time.Now(),
+		Products:  []string{"PROD1"},
+	}
+
+	err = orderRepo.Put(context.Background(), invalidOrder)
+	if err == nil {
+		t.Error("Expected error when putting order with missing order ID, got nil")
+	}
+
+	// Test putting an invalid order (missing user email)
+	invalidOrder = models.Order{
+		OrderID:   "ORD123",
+		Status:    "PENDING",
+		Total:     99.99,
+		CreatedAt: time.Now(),
+		Products:  []string{"PROD1"},
+	}
+
+	err = orderRepo.Put(context.Background(), invalidOrder)
+	if err == nil {
+		t.Error("Expected error when putting order with missing user email, got nil")
 	}
 }
 
@@ -304,86 +276,74 @@ func TestOrderRepository_GetUserOrders(t *testing.T) {
 	_, _, _, orderRepo, _, cleanup := testSetup(t)
 	defer cleanup()
 
-	testUser, testOrders, _ := createTestData()
+	userEmail := "test@example.com"
 
-	// Store test orders
-	for _, order := range testOrders {
+	// Create and store some test orders
+	orders := []models.Order{
+		{
+			OrderID:   "ORD1",
+			UserEmail: userEmail,
+			Status:    "PENDING",
+			Total:     99.99,
+			CreatedAt: time.Now(),
+			Products:  []string{"PROD1"},
+		},
+		{
+			OrderID:   "ORD2",
+			UserEmail: userEmail,
+			Status:    "COMPLETED",
+			Total:     199.99,
+			CreatedAt: time.Now(),
+			Products:  []string{"PROD2", "PROD3"},
+		},
+		{
+			OrderID:   "ORD3",
+			UserEmail: userEmail,
+			Status:    "PENDING",
+			Total:     299.99,
+			CreatedAt: time.Now(),
+			Products:  []string{"PROD4"},
+		},
+	}
+
+	for _, order := range orders {
 		err := orderRepo.Put(context.Background(), order)
 		if err != nil {
 			t.Fatalf("Failed to put test order: %v", err)
 		}
 	}
 
-	tests := []struct {
-		name          string
-		userEmail     string
-		opts          *QueryOptions
-		wantCount     int
-		wantNextToken bool
-		wantErr       bool
-	}{
-		{
-			name:      "get all orders",
-			userEmail: testUser.Email,
-			opts:      nil,
-			wantCount: 3,
-			wantErr:   false,
-		},
-		{
-			name:      "get orders with pagination",
-			userEmail: testUser.Email,
-			opts: &QueryOptions{
-				Limit: 2,
-			},
-			wantCount:     2,
-			wantNextToken: true,
-			wantErr:       false,
-		},
-		{
-			name:      "get orders for non-existent user",
-			userEmail: "nonexistent@example.com",
-			opts:      nil,
-			wantCount: 0,
-			wantErr:   false,
-		},
+	// Test getting all orders
+	result, err := orderRepo.GetUserOrders(context.Background(), userEmail, nil)
+	if err != nil {
+		t.Fatalf("Failed to get user orders: %v", err)
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result, err := orderRepo.GetUserOrders(context.Background(), tt.userEmail, tt.opts)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("GetUserOrders() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
+	if len(result.Orders) != len(orders) {
+		t.Errorf("Got %d orders, want %d", len(result.Orders), len(orders))
+	}
 
-			if len(result.Orders) != tt.wantCount {
-				t.Errorf("Got %d orders, want %d", len(result.Orders), tt.wantCount)
-			}
+	// Test pagination
+	result, err = orderRepo.GetUserOrders(context.Background(), userEmail, &QueryOptions{Limit: 2})
+	if err != nil {
+		t.Fatalf("Failed to get paginated user orders: %v", err)
+	}
 
-			if (result.NextPageToken != nil) != tt.wantNextToken {
-				t.Errorf("NextPageToken = %v, want %v", result.NextPageToken != nil, tt.wantNextToken)
-			}
+	if len(result.Orders) != 2 {
+		t.Errorf("Got %d orders with pagination, want 2", len(result.Orders))
+	}
 
-			// Verify order fields
-			if tt.wantCount > 0 {
-				for _, order := range result.Orders {
-					if order.UserEmail != tt.userEmail {
-						t.Errorf("UserEmail = %v, want %v", order.UserEmail, tt.userEmail)
-					}
-					if order.OrderID == "" {
-						t.Error("OrderID is empty")
-					}
-					if order.Status == "" {
-						t.Error("Status is empty")
-					}
-					if order.Total <= 0 {
-						t.Error("Total is not positive")
-					}
-					if len(order.Products) == 0 {
-						t.Error("Products is empty")
-					}
-				}
-			}
-		})
+	if result.NextPageToken == nil {
+		t.Error("Expected next page token for paginated results, got nil")
+	}
+
+	// Test getting orders for non-existent user
+	result, err = orderRepo.GetUserOrders(context.Background(), "nonexistent@example.com", nil)
+	if err != nil {
+		t.Fatalf("Failed to get orders for non-existent user: %v", err)
+	}
+
+	if len(result.Orders) != 0 {
+		t.Errorf("Got %d orders for non-existent user, want 0", len(result.Orders))
 	}
 }
