@@ -21,8 +21,8 @@ func (r *ProductRepository) Put(ctx context.Context, product models.Product) err
 		return err
 	}
 	item := GenericItem[models.Product]{
-		PK:         Key.NewProductPK(),
-		SK:         Key.NewProductSK(product.ProductID),
+		PK:         Key.ProductPK(),
+		SK:         Key.ProductSK(product.ProductID),
 		EntityType: EntityProduct,
 		Data:       product,
 	}
@@ -31,7 +31,7 @@ func (r *ProductRepository) Put(ctx context.Context, product models.Product) err
 
 func (r *ProductRepository) Get(ctx context.Context, productID string) (*models.Product, error) {
 	var item GenericItem[models.Product]
-	err := GetItem(ctx, r.store, Key.NewProductPK(), Key.NewProductSK(productID), &item)
+	err := GetItem(ctx, r.store, Key.ProductPK(), Key.ProductSK(productID), &item)
 	if err != nil {
 		return nil, err
 	}

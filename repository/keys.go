@@ -6,23 +6,22 @@ type KeyFactory struct{}
 
 var Key = KeyFactory{}
 
-// Key constructors
-func (KeyFactory) NewUserPK(email string) PrimaryKey {
+func (KeyFactory) UserPK(email string) PrimaryKey {
 	return PrimaryKey(fmt.Sprintf("USER#%s", email))
 }
 
-func (KeyFactory) NewUserSK(email string) SortKey {
+func (KeyFactory) UserSK(email string) SortKey {
 	return SortKey(fmt.Sprintf("PROFILE#%s", email))
 }
 
-func (KeyFactory) NewOrderSK(orderID string) SortKey {
+func (KeyFactory) OrderSK(orderID string) SortKey {
 	return SortKey(fmt.Sprintf("ORDER#%s", orderID))
 }
 
-func (KeyFactory) NewProductPK() PrimaryKey {
-	return PrimaryKey("PRODUCT#ALL")
+func (KeyFactory) ProductPK() PrimaryKey {
+	return "PRODUCT#ALL"
 }
 
-func (KeyFactory) NewProductSK(productID string) SortKey {
+func (KeyFactory) ProductSK(productID string) SortKey {
 	return SortKey(fmt.Sprintf("PRODUCT#%s", productID))
 }

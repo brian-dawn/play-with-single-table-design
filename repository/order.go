@@ -35,8 +35,8 @@ func (r *OrderRepository) Put(ctx context.Context, order models.Order) error {
 		return err
 	}
 	item := GenericItem[models.Order]{
-		PK:         Key.NewUserPK(order.UserEmail),
-		SK:         Key.NewOrderSK(order.OrderID),
+		PK:         Key.UserPK(order.UserEmail),
+		SK:         Key.OrderSK(order.OrderID),
 		EntityType: EntityOrder,
 		Data:       order,
 	}
@@ -45,7 +45,7 @@ func (r *OrderRepository) Put(ctx context.Context, order models.Order) error {
 
 // GetUserOrders retrieves orders for a user from DynamoDB with pagination support
 func (r *OrderRepository) GetUserOrders(ctx context.Context, userEmail string, opts *QueryOptions) (*OrdersPage, error) {
-	result, err := Query[models.Order](ctx, r.store, Key.NewUserPK(userEmail), "ORDER#", opts)
+	result, err := Query[models.Order](ctx, r.store, Key.UserPK(userEmail), "ORDER#", opts)
 	if err != nil {
 		return nil, err
 	}
