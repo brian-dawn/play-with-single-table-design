@@ -13,7 +13,7 @@ down:
 
 # Build the application
 build:
-	go build -v ./...
+	go build -v .
 
 # Run tests
 test: up
