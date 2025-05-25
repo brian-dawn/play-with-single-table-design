@@ -25,3 +25,7 @@ Build:
 Run:
 
   make run
+  
+We host a local dynamodb instance with an admin panel that can be accessedd at:
+
+    http://locahost:8001
