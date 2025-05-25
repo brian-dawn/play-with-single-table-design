@@ -1,79 +1,53 @@
 package models
 
 import (
-	"errors"
 	"time"
+
+	"github.com/go-playground/validator/v10"
 )
+
+var validate *validator.Validate
+
+func init() {
+	validate = validator.New()
+}
 
 // User represents a user in the system
 type User struct {
-	Email     string    `json:"email" dynamodbav:"email"`
-	Name      string    `json:"name" dynamodbav:"name"`
+	Email     string    `json:"email" dynamodbav:"email" validate:"required,email"`
+	Name      string    `json:"name" dynamodbav:"name" validate:"required"`
 	CreatedAt time.Time `json:"created_at" dynamodbav:"created_at"`
 }
 
 // Validate validates the user fields
 func (u User) Validate() error {
-	if u.Email == "" {
-		return errors.New("email is required")
-	}
-	if u.Name == "" {
-		return errors.New("name is required")
-	}
-	return nil
+	return validate.Struct(u)
 }
 
 // Order represents an order in the system
 type Order struct {
-	OrderID   string    `json:"order_id" dynamodbav:"order_id"`
-	UserEmail string    `json:"user_email" dynamodbav:"user_email"`
-	Status    string    `json:"status" dynamodbav:"status"`
-	Total     float64   `json:"total" dynamodbav:"total"`
-	Products  []string  `json:"products" dynamodbav:"products"`
+	OrderID   string    `json:"order_id" dynamodbav:"order_id" validate:"required"`
+	UserEmail string    `json:"user_email" dynamodbav:"user_email" validate:"required,email"`
+	Status    string    `json:"status" dynamodbav:"status" validate:"required,oneof=pending processing completed cancelled"`
+	Total     float64   `json:"total" dynamodbav:"total" validate:"required,gte=0"`
+	Products  []string  `json:"products" dynamodbav:"products" validate:"required,min=1,dive,required"`
 	CreatedAt time.Time `json:"created_at" dynamodbav:"created_at"`
 }
 
 // Validate validates the order fields
 func (o Order) Validate() error {
-	if o.OrderID == "" {
-		return errors.New("order_id is required")
-	}
-	if o.UserEmail == "" {
-		return errors.New("user_email is required")
-	}
-	if o.Status == "" {
-		return errors.New("status is required")
-	}
-	if len(o.Products) == 0 {
-		return errors.New("at least one product is required")
-	}
-	return nil
+	return validate.Struct(o)
 }
 
 type Product struct {
-	ProductID string    `json:"product_id" dynamodbav:"product_id"`
-	Category  string    `json:"category" dynamodbav:"category"`
-	Name      string    `json:"name" dynamodbav:"name"`
-	Price     float64   `json:"price" dynamodbav:"price"`
-	Stock     int       `json:"stock" dynamodbav:"stock"`
+	ProductID string    `json:"product_id" dynamodbav:"product_id" validate:"required"`
+	Category  string    `json:"category" dynamodbav:"category" validate:"required"`
+	Name      string    `json:"name" dynamodbav:"name" validate:"required"`
+	Price     float64   `json:"price" dynamodbav:"price" validate:"required,gt=0"`
+	Stock     int       `json:"stock" dynamodbav:"stock" validate:"gte=0"`
 	CreatedAt time.Time `json:"created_at" dynamodbav:"created_at"`
 }
 
 func (p Product) Validate() error {
-	if p.ProductID == "" {
-		return errors.New("product_id is required")
-	}
-	if p.Category == "" {
-		return errors.New("category is required")
-	}
-	if p.Name == "" {
-		return errors.New("name is required")
-	}
-	if p.Price <= 0 {
-		return errors.New("price is required")
-	}
-	if p.Stock < 0 {
-		return errors.New("stock can't be less than 0")
-	}
-	return nil
+	return validate.Struct(p)
 }
