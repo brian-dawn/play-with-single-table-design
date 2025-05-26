@@ -59,6 +59,31 @@ func main() {
 		log.Fatalf("failed to ensure table exists: %v", err)
 	}
 
+	// Insert some misc products
+	products := []models.Product{
+		{
+			ProductID: "PROD1",
+			Name:      "Product 1",
+			Price:     10.99,
+			Category:  "Electronics",
+			Stock:     23,
+		},
+		{
+			ProductID: "PROD2",
+			Name:      "Product 2",
+			Price:     20.99,
+			Category:  "Electronics",
+			Stock:     100,
+		},
+	}
+	for _, product := range products {
+		err := productRepo.Put(context.Background(), product)
+		if err != nil {
+			log.Fatalf("failed to put product: %v", err)
+		}
+		fmt.Printf("Created product: %s\n", product.ProductID)
+	}
+
 	// Example: Create a new user
 	user := models.User{
 		Email:     "john@example.com",
