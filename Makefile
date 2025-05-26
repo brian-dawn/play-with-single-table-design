@@ -15,6 +15,9 @@ down:
 build:
 	go build -v .
 
+watch:
+	air
+
 # Run tests
 test: up
 	go test -v ./...
@@ -40,6 +43,7 @@ help:
 	@echo "  up            - Start Docker services (DynamoDB Local and Admin)"
 	@echo "  down          - Stop Docker services"
 	@echo "  build         - Build the application"
+	@echo "  watch         - Watch for changes and rerun the application, runs a proxy server on :8081"
 	@echo "  test          - Run tests (starts Docker services first)"
 	@echo "  test-coverage - Run tests with coverage report"
 	@echo "  run           - Run the application (starts Docker services first)"
