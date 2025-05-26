@@ -17,6 +17,7 @@ import (
 
 	"LearnSingleTableDesign/models"
 	"LearnSingleTableDesign/repository"
+	"LearnSingleTableDesign/web"
 )
 
 func main() {
@@ -116,6 +117,8 @@ func main() {
 		pageToken = page.NextPageToken
 		pageNum++
 	}
+
+	web.Start()
 }
 
 // ensureTableExists creates the DynamoDB table if it doesn't exist
