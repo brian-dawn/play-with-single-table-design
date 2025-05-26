@@ -52,6 +52,7 @@ func main() {
 	tableName := "AppTable"
 	userRepo := repository.NewUserRepository(client, tableName)
 	orderRepo := repository.NewOrderRepository(client, tableName)
+	productRepo := repository.NewProductRepository(client, tableName)
 
 	// Ensure the table exists before proceeding
 	if err := ensureTableExists(context.TODO(), client, tableName); err != nil {
@@ -118,7 +119,9 @@ func main() {
 		pageNum++
 	}
 
-	web.Start()
+	web.Start(
+		userRepo, orderRepo, productRepo,
+	)
 }
 
 // ensureTableExists creates the DynamoDB table if it doesn't exist

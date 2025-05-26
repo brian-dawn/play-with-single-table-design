@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"LearnSingleTableDesign/repository"
 	. "maragu.dev/gomponents"
 	. "maragu.dev/gomponents/html"
 )
@@ -83,16 +84,32 @@ func Navbar() Node {
 	)
 }
 
-func indexHandler(w http.ResponseWriter, r *http.Request) {
+func (a *App) indexHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Write([]byte("<!DOCTYPE html>\n"))
 	BaseHTML(Navbar()).Render(w)
 }
 
-func Start() {
+type App struct {
+	userRepo    *repository.UserRepository
+	orderRepo   *repository.OrderRepository
+	productRepo *repository.ProductRepository
+}
+
+func Start(
+	userRepo *repository.UserRepository,
+	orderRepo *repository.OrderRepository,
+	productRepo *repository.ProductRepository,
+) {
+	app := &App{
+		userRepo:    userRepo,
+		orderRepo:   orderRepo,
+		productRepo: productRepo,
+	}
+
 	// Create a new ServeMux to use our middleware
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", indexHandler)
+	mux.HandleFunc("/", app.indexHandler)
 
 	// Wrap the mux with the pretty print middleware
 	handler := PrettyPrintHTML(mux)
