@@ -1,6 +1,8 @@
 package web
 
 import (
+	"context"
+	"fmt"
 	"log"
 	"log/slog"
 	"net/http"
@@ -90,10 +92,26 @@ func (a *App) indexHandler(w http.ResponseWriter, r *http.Request) {
 	BaseHTML(Navbar()).Render(w)
 }
 
+func (a *App) listProductsComponent() Node {
+
+	products, err := a.products.All(context.Background(), nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	productsLoaded := len(products.Products)
+
+	return Div(
+		Class("flex flex-col space-y-4"),
+		H1(Text("Products")),
+		Div(Text(fmt.Sprintf("Total products: %d", productsLoaded))),
+	)
+}
+
 type App struct {
-	userRepo    *repository.UserRepository
-	orderRepo   *repository.OrderRepository
-	productRepo *repository.ProductRepository
+	users    *repository.UserRepository
+	orders   *repository.OrderRepository
+	products *repository.ProductRepository
 }
 
 func Start(
@@ -102,9 +120,9 @@ func Start(
 	productRepo *repository.ProductRepository,
 ) {
 	app := &App{
-		userRepo:    userRepo,
-		orderRepo:   orderRepo,
-		productRepo: productRepo,
+		users:    userRepo,
+		orders:   orderRepo,
+		products: productRepo,
 	}
 
 	// Create a new ServeMux to use our middleware
